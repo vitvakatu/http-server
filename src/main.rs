@@ -1,24 +1,23 @@
-use async_std::net::{TcpListener, TcpStream};
-use async_std::prelude::*;
-use futures::stream::StreamExt;
+use std::io::prelude::*;
+use std::net::{TcpListener, TcpStream};
+use std::thread;
 use std::time::Duration;
 
-#[async_std::main]
-async fn main() {
-    let listener = TcpListener::bind("0.0.0.0:7878").await.unwrap();
+use server::ThreadPool;
 
-    listener
-        .incoming()
-        .for_each_concurrent(None, |stream| async move {
-            let stream = stream.unwrap();
-            async_std::task::spawn(handle_connection(stream));
-        })
-        .await;
+fn main() {
+    let listener = TcpListener::bind("0.0.0.0:7878").unwrap();
+
+    let pool = ThreadPool::new(16);
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
+        pool.execute(move || handle_connection(stream));
+    }
 }
 
-async fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream) {
     let mut buffer = [0; 1024];
-    stream.read(&mut buffer).await.unwrap();
+    stream.read(&mut buffer).unwrap();
 
     let get = b"GET / HTTP/1.1\r\n";
     let sleep = b"GET /sleep HTTP/1.1\r\n";
@@ -26,7 +25,7 @@ async fn handle_connection(mut stream: TcpStream) {
     let (status, content) = if buffer.starts_with(get) {
         ("200 OK", include_str!("../hello.html"))
     } else if buffer.starts_with(sleep) {
-        async_std::task::sleep(Duration::from_secs(5)).await;
+        thread::sleep(Duration::from_secs(5));
         ("200 OK", include_str!("../hello.html"))
     } else {
         ("400 NOT FOUND", include_str!("../404.html"))
@@ -37,6 +36,6 @@ async fn handle_connection(mut stream: TcpStream) {
         content.len(),
         content
     );
-    stream.write(response.as_bytes()).await.unwrap();
-    stream.flush().await.unwrap();
+    stream.write(response.as_bytes()).unwrap();
+    stream.flush().unwrap();
 }
