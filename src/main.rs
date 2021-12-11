@@ -19,19 +19,19 @@ fn handle_connection(mut stream: TcpStream) {
     let mut buffer = [0; 1024];
     stream.read(&mut buffer).unwrap();
 
-    let get = b"GET / HTTP/1.1\r\n";
-    let sleep = b"GET /sleep HTTP/1.1\r\n";
+    let get = b"GET / HTTP/1.0\r\n";
+    let sleep = b"GET /sleep HTTP/1.0\r\n";
 
     let (status, content) = if buffer.starts_with(get) {
         ("200 OK", include_str!("../hello.html"))
     } else if buffer.starts_with(sleep) {
-        thread::sleep(Duration::from_secs(5));
+        thread::sleep(Duration::from_secs(1));
         ("200 OK", include_str!("../hello.html"))
     } else {
         ("400 NOT FOUND", include_str!("../404.html"))
     };
     let response = format!(
-        "HTTP/1.1 {}\r\nContent-Length: {}\r\n\r\n{}",
+        "HTTP/1.0 {}\r\nContent-Length: {}\r\n\r\n{}",
         status,
         content.len(),
         content
